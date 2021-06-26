@@ -12,26 +12,25 @@ var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func main() {
 	wg := &sync.WaitGroup{}
-	m := &sync.Mutex{}
 	cacheCh := make(chan Book)
 	dbCh := make(chan Book)
 	for i := 0; i < 10; i++ {
 		id := rnd.Intn(10) + 1
 		wg.Add(2)
 		// send only channel
-		go func(id int, wg *sync.WaitGroup, mutex *sync.Mutex, ch chan<- Book) {
-			if b, ok := queryCache(id, m); ok {
+		go func(id int, wg *sync.WaitGroup, ch chan<- Book) {
+			if b, ok := queryCache(id); ok {
 				ch <- b
 			}
 			wg.Done()
-		}(id, wg, m, cacheCh)
+		}(id, wg, cacheCh)
 		// send only channel
-		go func(id int, wg *sync.WaitGroup, mutex *sync.Mutex, ch chan<- Book) {
-			if b, ok := queryDatabase(id, m); ok {
+		go func(id int, wg *sync.WaitGroup, ch chan<- Book) {
+			if b, ok := queryDatabase(id); ok {
 				ch <- b
 			}
 			wg.Done()
-		}(id, wg, m, dbCh)
+		}(id, wg, dbCh)
 
 		// one goroutine to receive results from cache and database channels
 		go func(cacheCh, dbCh <-chan Book) {
@@ -55,16 +54,12 @@ func main() {
 	wg.Wait()
 }
 
-func queryCache(id int, m *sync.Mutex) (Book, bool) {
-	m.Lock()
-	defer m.Unlock()
+func queryCache(id int) (Book, bool) {
 	b, ok := cache[id]
 	return b, ok
 }
 
-func queryDatabase(id int, m *sync.Mutex) (Book, bool) {
-	m.Lock()
-	defer m.Unlock()
+func queryDatabase(id int) (Book, bool) {
 	time.Sleep(time.Millisecond * 100)
 	for _, b := range books {
 		if b.ID == id {
